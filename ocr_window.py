@@ -74,20 +74,30 @@ def show_ocr_window(image: Image.Image, ocr_engine):
                     translated = tr.chinese_to_english(current_text)
                 else:
                     translated = tr.english_to_chinese(current_text)
-                trans_state["text"] = translated
-                elapsed = time.time() - t0
-                win.after(0, lambda: _show_original_with_translation(translated))
-                win.after(0, lambda: status_label.configure(
-                    text=f"翻译完成 ({elapsed:.1f}s)", fg="#060"))
-            except Exception as e:
-                trans_state["direction"] = None
-                win.after(0, lambda: _show_original_with_translation(None))
-                win.after(0, lambda: status_label.configure(
-                    text=f"翻译失败", fg="red"))
-            win.after(0, lambda: btn_c2e.configure(state="normal"))
-            win.after(0, lambda: btn_e2c.configure(state="normal"))
+                result["translation"] = translated
+                result["translation_error"] = None
+            except Exception:
+                result["translation"] = None
+                result["translation_error"] = True
+            result["translation_done"] = True
 
         threading.Thread(target=translate_async, daemon=True).start()
+
+    def _on_translation_done():
+        translated = result.get("translation")
+        if translated is not None:
+            elapsed = 0  # rough, not critical
+            _show_original_with_translation(translated)
+            status_label.configure(text="翻译完成", fg="#060")
+            btn_c2e.configure(state="normal")
+            btn_e2c.configure(state="normal")
+        else:
+            trans_state["direction"] = None
+            _show_original_with_translation(None)
+            status_label.configure(text="翻译失败", fg="red")
+            btn_c2e.configure(state="normal")
+            btn_e2c.configure(state="normal")
+        result["translation"] = None
 
     btn_c2e.configure(command=lambda: do_translate("c2e"))
     btn_e2c.configure(command=lambda: do_translate("e2c"))
@@ -144,7 +154,9 @@ def show_ocr_window(image: Image.Image, ocr_engine):
 
     # Thread-safe result: background thread writes here, main thread polls
     result = {"text": "", "error": None, "done": False,
-              "elapsed": 0, "status": "预处理中..."}
+              "elapsed": 0, "status": "预处理中...",
+              "translation": None, "translation_done": False,
+              "translation_error": None}
 
     def do_ocr():
         t0 = time.time()
@@ -173,10 +185,17 @@ def show_ocr_window(image: Image.Image, ocr_engine):
             status_label.configure(text=cur_status)
 
         if result["done"]:
-            _on_ocr_done()
-        else:
-            # Poll every 100ms
-            status_label.after(100, poll_result)
+            if not hasattr(poll_result, "_ocr_handled"):
+                poll_result._ocr_handled = True
+                _on_ocr_done()
+
+        # Check for translation completion
+        if result["translation_done"]:
+            _on_translation_done()
+            result["translation_done"] = False  # prevent re-trigger
+
+        # Keep polling to handle translation results
+        status_label.after(200, poll_result)
 
     def _on_ocr_done():
         text_widget.configure(state="normal", fg="#000")

@@ -13,7 +13,13 @@ def _translate(source: str, target: str, text: str) -> str:
         if cache_key in _CACHE:
             return _CACHE[cache_key]
     try:
-        result = ts.translate_text(text, from_language=source, to_language=target)
+        # 15s timeout prevents hanging when network is slow/blocked
+        result = ts.translate_text(
+            text,
+            from_language=source,
+            to_language=target,
+            timeout=15,
+        )
         with _LOCK:
             _CACHE[cache_key] = result
         return result

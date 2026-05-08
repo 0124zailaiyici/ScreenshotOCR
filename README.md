@@ -9,6 +9,7 @@
 | 截图选区 | `Ctrl+Shift+A` 全局热键，任意应用中触发 |
 | 钉住 | 截图浮在屏幕最上层，滚轮缩放，拖拽移动，Esc 关闭 |
 | 识字 (OCR) | 识别截图中英文文字，弹出窗口自由选择复制 |
+| 翻译 (中↔EN) | OCR 识别后一键翻译，原文下方显示结果 |
 | 复制图片 | 一键复制截图到剪贴板 |
 
 ## 界面预览
@@ -21,7 +22,7 @@
     └─────────────┘
 
 钉住：截图浮窗，滚轮缩放，无边框
-识字：OCR 文字窗口，选中后 Ctrl+C 复制
+识字：OCR 文字窗口，支持选中复制和中英翻译
 复制：直接复制图片到剪贴板
 ```
 
@@ -66,7 +67,7 @@ python main.py
 
 如果 Tesseract 安装在非默认路径（如 `D:\develop\tesseract\`），需要在配置文件中指定。
 
-配置文件位置：`C:\Users\<用户名>\.screenshot_ocr_config.json`
+配置文件位置：与 `ScreenshotOCR.exe` 同级目录下的 `screenshot_ocr_config.json`
 
 ```json
 {
@@ -80,7 +81,7 @@ python main.py
 
 ## 配置文件说明
 
-首次运行后自动生成 `~/.screenshot_ocr_config.json`：
+首次运行后自动在 exe 同级目录生成 `screenshot_ocr_config.json`：
 
 | 配置项 | 默认值 | 说明 |
 |--------|--------|------|
@@ -88,6 +89,8 @@ python main.py
 | `ocr_backend` | `tesseract` | OCR 引擎，目前仅支持 tesseract |
 | `ocr_lang` | `chi_sim+eng` | OCR 语言，`eng` 仅英文，`chi_sim+eng` 中英混合 |
 | `tesseract_path` | `""` | Tesseract 安装路径，留空自动查找 |
+| `auto_copy_text` | `true` | 识字后自动复制文字到剪贴板 |
+| `auto_copy_image` | `true` | 截图后自动复制图片到剪贴板 |
 | `notification_enabled` | `true` | 是否显示托盘通知气泡 |
 
 ## 依赖
@@ -100,6 +103,7 @@ pystray>=0.19.5      # 系统托盘
 pytesseract>=0.3.10  # OCR Python 绑定
 Pillow>=10.0.0       # 图像处理
 pywin32>=306         # Windows API（剪贴板等）
+translators>=5.0.0   # 中英翻译（阿里云接口，国内可用）
 ```
 
 ### 外部依赖
@@ -115,10 +119,13 @@ pip install pyinstaller
 pyinstaller --noconsole --onefile --name "ScreenshotOCR" \
   --hidden-import pystray --hidden-import pynput \
   --hidden-import pytesseract --hidden-import win32clipboard \
+  --hidden-import translators \
   --add-data "ocr_backends;ocr_backends" main.py
 ```
 
 输出在 `dist/ScreenshotOCR.exe`。
+
+> ⚠️ 注意：翻译功能需要联网，默认使用阿里云翻译接口（国内可正常访问）。
 
 ## 项目结构
 
@@ -127,7 +134,8 @@ pyinstaller --noconsole --onefile --name "ScreenshotOCR" \
 ├── main.py                 # 入口：托盘 + 热键 + 流程调度
 ├── screenshot_overlay.py   # 全屏选区覆盖层 + 浮动工具栏
 ├── pin_window.py           # 钉住浮窗（无边框、滚轮缩放）
-├── ocr_window.py           # OCR 文字识别窗口
+├── ocr_window.py           # OCR 文字识别窗口（含翻译功能）
+├── translator.py           # 中英翻译模块（translators 库）
 ├── ocr_engine.py           # OCR 引擎工厂
 ├── ocr_backends/           # OCR 后端实现
 │   ├── base.py             #   抽象基类
