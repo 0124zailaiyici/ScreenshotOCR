@@ -5,3 +5,5 @@ __pycache__/
 *.pyc
 *.spec
 .DS_Store
+.claude/
+screenshot_ocr_config.json

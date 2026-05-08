@@ -1,5 +1,7 @@
 import json
 import os
+import sys
+
 
 DEFAULT_CONFIG = {
     "hotkey": "<ctrl>+<shift>+a",
@@ -11,7 +13,18 @@ DEFAULT_CONFIG = {
     "tesseract_path": "",
 }
 
-CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".screenshot_ocr_config.json")
+
+def _get_config_dir():
+    """Config lives next to the executable (or source code), not in C:\\Users."""
+    if getattr(sys, "frozen", False):
+        # PyInstaller: use the dir containing the .exe
+        return os.path.dirname(sys.executable)
+    else:
+        # Running from source: use the project directory
+        return os.path.dirname(os.path.abspath(__file__))
+
+
+CONFIG_PATH = os.path.join(_get_config_dir(), "screenshot_ocr_config.json")
 
 
 def load_config():
