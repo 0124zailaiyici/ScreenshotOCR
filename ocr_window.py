@@ -5,6 +5,7 @@ from tkinter import ttk
 from PIL import Image, ImageTk
 
 from clipboard_manager import set_text_to_clipboard
+import translator as tr
 
 
 def show_ocr_window(image: Image.Image, ocr_engine):
@@ -38,6 +39,58 @@ def show_ocr_window(image: Image.Image, ocr_engine):
 
     copy_all_btn = ttk.Button(btn_frame, text="复制全部", state="disabled")
     copy_all_btn.pack(side="left", padx=2)
+
+    # ---- translation buttons ----
+    ttk.Separator(btn_frame, orient="vertical").pack(side="left", fill="y", padx=4)
+
+    btn_c2e = ttk.Button(btn_frame, text="中→EN", state="disabled")
+    btn_c2e.pack(side="left", padx=2)
+
+    btn_e2c = ttk.Button(btn_frame, text="EN→中", state="disabled")
+    btn_e2c.pack(side="left", padx=2)
+
+    # Translate state
+    trans_state = {"direction": None, "text": ""}
+
+    def do_translate(direction):
+        """direction: 'c2e' or 'e2c' — runs in background thread."""
+        if trans_state["direction"] == direction:
+            return  # already translated this direction
+        current_text = result.get("text", "").strip()
+        if not current_text:
+            return
+
+        trans_state["direction"] = direction
+        btn_c2e.configure(state="disabled")
+        btn_e2c.configure(state="disabled")
+        status_label.configure(text="翻译中...", fg="#666")
+        # Re-show original + "翻译中" below
+        _show_original_with_translation(None)
+
+        def translate_async():
+            t0 = time.time()
+            try:
+                if direction == "c2e":
+                    translated = tr.chinese_to_english(current_text)
+                else:
+                    translated = tr.english_to_chinese(current_text)
+                trans_state["text"] = translated
+                elapsed = time.time() - t0
+                win.after(0, lambda: _show_original_with_translation(translated))
+                win.after(0, lambda: status_label.configure(
+                    text=f"翻译完成 ({elapsed:.1f}s)", fg="#060"))
+            except Exception as e:
+                trans_state["direction"] = None
+                win.after(0, lambda: _show_original_with_translation(None))
+                win.after(0, lambda: status_label.configure(
+                    text=f"翻译失败", fg="red"))
+            win.after(0, lambda: btn_c2e.configure(state="normal"))
+            win.after(0, lambda: btn_e2c.configure(state="normal"))
+
+        threading.Thread(target=translate_async, daemon=True).start()
+
+    btn_c2e.configure(command=lambda: do_translate("c2e"))
+    btn_e2c.configure(command=lambda: do_translate("e2c"))
 
     ttk.Separator(toolbar, orient="vertical").pack(side="left", fill="y", padx=6)
 
@@ -146,6 +199,17 @@ def show_ocr_window(image: Image.Image, ocr_engine):
                 fg="#333")
             copy_sel_btn.configure(state="normal")
             copy_all_btn.configure(state="normal")
+            btn_c2e.configure(state="normal")
+            btn_e2c.configure(state="normal")
+
+    def _show_original_with_translation(translated):
+        text_widget.configure(state="normal")
+        text_widget.delete("1.0", "end")
+        text_widget.insert("1.0", result["text"] if result.get("text") else "")
+        if translated is not None:
+            text_widget.insert("end", "\n\n─── 翻译 ───\n")
+            text_widget.insert("end", translated)
+        text_widget.configure(state="normal")
 
     def copy_selected():
         try:
